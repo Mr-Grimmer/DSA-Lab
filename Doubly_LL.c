@@ -3,10 +3,9 @@
 
 typedef struct Node {
     int data;
-    struct Node *prev, *next;
+    struct Node* prev;
+    struct Node* next;
 } Node;
-
-Node* head = NULL;
 
 Node* createNode(int data) {
     Node* newNode = (Node*) malloc(sizeof(Node));
@@ -15,183 +14,186 @@ Node* createNode(int data) {
     return newNode;
 }
 
-void printList() {
-    Node* temp = head;
-    printf("List: ");
-    while (temp) {
-        printf("%d ", temp->data);
-        temp = temp->next;
-    }
-    printf("\n");
-}
-
-void insertFront(int data) {
-    Node* newNode = createNode(data);
-    if (head) {
-        newNode->next = head;
-        head->prev = newNode;
-    }
-    head = newNode;
-}
-
-void insertEnd(int data) {
-    Node* newNode = createNode(data);
+void printList(Node* head) {
     if (!head) {
-        head = newNode;
+        printf("List is empty.\n");
         return;
     }
-    Node* temp = head;
-    while (temp->next)
-        temp = temp->next;
-    temp->next = newNode;
-    newNode->prev = temp;
+    while (head) {
+        printf("%d <-> ", head->data);
+        head = head->next;
+    }
+    printf("NULL\n");
 }
 
-void insertAfterK(int k, int data) {
-    Node* temp = head;
-    for (int i = 1; temp && i < k; i++)
-        temp = temp->next;
-    if (!temp) return;
+void insertFront(Node** head, int data) {
     Node* newNode = createNode(data);
-    newNode->next = temp->next;
-    newNode->prev = temp;
-    if (temp->next)
-        temp->next->prev = newNode;
-    temp->next = newNode;
+    newNode->next = *head;
+    if (*head)
+        (*head)->prev = newNode;
+    *head = newNode;
 }
 
-void insertAfterValue(int value, int data) {
-    Node* temp = head;
-    while (temp && temp->data != value)
-        temp = temp->next;
-    if (!temp) return;
+void insertEnd(Node** head, int data) {
     Node* newNode = createNode(data);
-    newNode->next = temp->next;
-    newNode->prev = temp;
-    if (temp->next)
-        temp->next->prev = newNode;
-    temp->next = newNode;
-}
-
-void insertBeforeK(int k, int data) {
-    if (k == 1) {
-        insertFront(data);
+    if (!*head) {
+        *head = newNode;
         return;
     }
-    Node* temp = head;
-    for (int i = 1; temp && i < k; i++)
-        temp = temp->next;
-    if (!temp) return;
+    Node* temp = *head;
+    while (temp->next) temp = temp->next;
+    temp->next = newNode;
+    newNode->prev = temp;
+}
+
+void insertAfterK(Node* head, int k, int data) {
+    while (k-- && head) head = head->next;
+    if (!head) {
+        printf("Invalid position.\n");
+        return;
+    }
+    Node* newNode = createNode(data);
+    newNode->next = head->next;
+    newNode->prev = head;
+    if (head->next)
+        head->next->prev = newNode;
+    head->next = newNode;
+}
+
+void insertAfterValue(Node* head, int val, int data) {
+    while (head && head->data != val) head = head->next;
+    if (!head) {
+        printf("Value not found.\n");
+        return;
+    }
+    insertAfterK(head, 0, data);
+}
+
+void insertBeforeK(Node** head, int k, int data) {
+    if (k == 0 || !*head) {
+        insertFront(head, data);
+        return;
+    }
+    Node* temp = *head;
+    for (int i = 0; i < k && temp; i++) temp = temp->next;
+    if (!temp) {
+        printf("Invalid position.\n");
+        return;
+    }
     Node* newNode = createNode(data);
     newNode->next = temp;
     newNode->prev = temp->prev;
     if (temp->prev)
         temp->prev->next = newNode;
+    else
+        *head = newNode;
     temp->prev = newNode;
-    if (temp == head)
-        head = newNode;
 }
 
-void insertBeforeValue(int value, int data) {
-    Node* temp = head;
-    while (temp && temp->data != value)
-        temp = temp->next;
-    if (!temp) return;
-    if (temp == head) {
-        insertFront(data);
+void insertBeforeValue(Node** head, int val, int data) {
+    Node* temp = *head;
+    while (temp && temp->data != val) temp = temp->next;
+    if (!temp) {
+        printf("Value not found.\n");
         return;
     }
-    Node* newNode = createNode(data);
-    newNode->prev = temp->prev;
-    newNode->next = temp;
-    temp->prev->next = newNode;
-    temp->prev = newNode;
+    insertBeforeK(head, 0, data); // handle edge case
+    if (temp == *head)
+        insertFront(head, data);
+    else
+        insertBeforeK(head, 0, data);
 }
 
-void deleteFirst() {
-    if (!head) return;
-    Node* temp = head;
-    head = head->next;
-    if (head)
-        head->prev = NULL;
+void deleteFirst(Node** head) {
+    if (!*head) return;
+    Node* temp = *head;
+    *head = temp->next;
+    if (*head)
+        (*head)->prev = NULL;
     free(temp);
 }
 
-void deleteLast() {
-    if (!head) return;
-    Node* temp = head;
-    if (!temp->next) {
+void deleteLast(Node** head) {
+    if (!*head) return;
+    Node* temp = *head;
+    while (temp->next) temp = temp->next;
+    if (temp->prev)
+        temp->prev->next = NULL;
+    else
+        *head = NULL;
+    free(temp);
+}
+
+void deleteAfterK(Node* head, int k) {
+    while (k-- && head) head = head->next;
+    if (!head || !head->next) {
+        printf("Invalid position.\n");
+        return;
+    }
+    Node* del = head->next;
+    head->next = del->next;
+    if (del->next)
+        del->next->prev = head;
+    free(del);
+}
+
+void deleteBeforeK(Node** head, int k) {
+    if (k <= 1 || !*head) {
+        printf("Invalid position.\n");
+        return;
+    }
+    Node* temp = *head;
+    for (int i = 1; i < k - 1 && temp; i++) temp = temp->next;
+    if (!temp) {
+        printf("Invalid position.\n");
+        return;
+    }
+    if (temp == *head)
+        deleteFirst(head);
+    else {
+        temp->prev->next = temp->next;
+        if (temp->next)
+            temp->next->prev = temp->prev;
         free(temp);
-        head = NULL;
+    }
+}
+
+void deleteK(Node** head, int k) {
+    if (!*head) return;
+    Node* temp = *head;
+    for (int i = 0; i < k && temp; i++) temp = temp->next;
+    if (!temp) {
+        printf("Invalid position.\n");
         return;
     }
-    while (temp->next)
-        temp = temp->next;
-    temp->prev->next = NULL;
+    if (temp->prev)
+        temp->prev->next = temp->next;
+    else
+        *head = temp->next;
+    if (temp->next)
+        temp->next->prev = temp->prev;
     free(temp);
 }
 
-void deleteAfterK(int k) {
-    Node* temp = head;
-    for (int i = 1; temp && i < k; i++)
-        temp = temp->next;
-    if (!temp || !temp->next) return;
-    Node* toDelete = temp->next;
-    temp->next = toDelete->next;
-    if (toDelete->next)
-        toDelete->next->prev = temp;
-    free(toDelete);
-}
-
-void deleteBeforeK(int k) {
-    if (k <= 1 || !head) return;
-    Node* temp = head;
-    for (int i = 1; temp && i < k; i++)
-        temp = temp->next;
-    if (!temp || !temp->prev) return;
-    Node* toDelete = temp->prev;
-    if (toDelete == head) {
-        head = temp;
-        head->prev = NULL;
-    } else {
-        toDelete->prev->next = temp;
-        temp->prev = toDelete->prev;
+void deleteByValue(Node** head, int val) {
+    Node* temp = *head;
+    while (temp && temp->data != val) temp = temp->next;
+    if (!temp) {
+        printf("Value not found.\n");
+        return;
     }
-    free(toDelete);
-}
-
-void deleteKth(int k) {
-    if (!head) return;
-    Node* temp = head;
-    for (int i = 1; temp && i < k; i++)
-        temp = temp->next;
-    if (!temp) return;
-    if (temp == head)
-        head = temp->next;
     if (temp->prev)
         temp->prev->next = temp->next;
+    else
+        *head = temp->next;
     if (temp->next)
         temp->next->prev = temp->prev;
     free(temp);
 }
 
-void deleteByValue(int value) {
-    Node* temp = head;
-    while (temp && temp->data != value)
-        temp = temp->next;
-    if (!temp) return;
-    if (temp == head)
-        head = temp->next;
-    if (temp->prev)
-        temp->prev->next = temp->next;
-    if (temp->next)
-        temp->next->prev = temp->prev;
-    free(temp);
-}
-
-void reverseList() {
+void reverseList(Node** head) {
     Node* temp = NULL;
-    Node* current = head;
+    Node* current = *head;
     while (current) {
         temp = current->prev;
         current->prev = current->next;
@@ -199,41 +201,89 @@ void reverseList() {
         current = current->prev;
     }
     if (temp)
-        head = temp->prev;
+        *head = temp->prev;
 }
 
-// Menu-driven program
 int main() {
-    int choice, data, k, value;
+    Node* head = NULL;
+    int choice, data, k, val;
 
     while (1) {
-        printf("\n--- MENU ---\n");
-        printf("1. Insert at Front\n2. Insert at End\n3. Insert after Kth node\n4. Insert after value\n");
-        printf("5. Insert before Kth node\n6. Insert before value\n7. Delete First\n8. Delete Last\n");
-        printf("9. Delete after Kth node\n10. Delete before Kth node\n11. Delete Kth node\n12. Delete by value\n");
-        printf("13. Print List\n14. Reverse List\n15. Exit\n");
-        printf("Enter choice: ");
+        printf("\n1. Create list\n2. Print list\n3. Insert front\n4. Insert end\n5. Insert after k\n6. Insert after value\n");
+        printf("7. Insert before k\n8. Insert before value\n9. Delete first\n10. Delete last\n11. Delete after k\n");
+        printf("12. Delete before k\n13. Delete kth\n14. Delete by value\n15. Reverse list\n0. Exit\nEnter choice: ");
         scanf("%d", &choice);
 
-        switch(choice) {
-            case 1: printf("Enter data: "); scanf("%d", &data); insertFront(data); break;
-            case 2: printf("Enter data: "); scanf("%d", &data); insertEnd(data); break;
-            case 3: printf("Enter position (k): "); scanf("%d", &k); printf("Enter data: "); scanf("%d", &data); insertAfterK(k, data); break;
-            case 4: printf("Enter value to search: "); scanf("%d", &value); printf("Enter data to insert: "); scanf("%d", &data); insertAfterValue(value, data); break;
-            case 5: printf("Enter position (k): "); scanf("%d", &k); printf("Enter data: "); scanf("%d", &data); insertBeforeK(k, data); break;
-            case 6: printf("Enter value to search: "); scanf("%d", &value); printf("Enter data to insert: "); scanf("%d", &data); insertBeforeValue(value, data); break;
-            case 7: deleteFirst(); break;
-            case 8: deleteLast(); break;
-            case 9: printf("Enter position (k): "); scanf("%d", &k); deleteAfterK(k); break;
-            case 10: printf("Enter position (k): "); scanf("%d", &k); deleteBeforeK(k); break;
-            case 11: printf("Enter position (k): "); scanf("%d", &k); deleteKth(k); break;
-            case 12: printf("Enter value: "); scanf("%d", &value); deleteByValue(value); break;
-            case 13: printList(); break;
-            case 14: reverseList(); printf("List reversed.\n"); break;
-            case 15: exit(0);
-            default: printf("Invalid choice.\n");
+        switch (choice) {
+            case 1:
+                head = NULL;
+                printf("List created.\n");
+                break;
+            case 2:
+                printList(head);
+                break;
+            case 3:
+                printf("Enter data: ");
+                scanf("%d", &data);
+                insertFront(&head, data);
+                break;
+            case 4:
+                printf("Enter data: ");
+                scanf("%d", &data);
+                insertEnd(&head, data);
+                break;
+            case 5:
+                printf("Enter k and data: ");
+                scanf("%d%d", &k, &data);
+                insertAfterK(head, k, data);
+                break;
+            case 6:
+                printf("Enter value and data: ");
+                scanf("%d%d", &val, &data);
+                insertAfterValue(head, val, data);
+                break;
+            case 7:
+                printf("Enter k and data: ");
+                scanf("%d%d", &k, &data);
+                insertBeforeK(&head, k, data);
+                break;
+            case 8:
+                printf("Enter value and data: ");
+                scanf("%d%d", &val, &data);
+                insertBeforeValue(&head, val, data);
+                break;
+            case 9:
+                deleteFirst(&head);
+                break;
+            case 10:
+                deleteLast(&head);
+                break;
+            case 11:
+                printf("Enter k: ");
+                scanf("%d", &k);
+                deleteAfterK(head, k);
+                break;
+            case 12:
+                printf("Enter k: ");
+                scanf("%d", &k);
+                deleteBeforeK(&head, k);
+                break;
+            case 13:
+                printf("Enter k: ");
+                scanf("%d", &k);
+                deleteK(&head, k);
+                break;
+            case 14:
+                printf("Enter value: ");
+                scanf("%d", &val);
+                deleteByValue(&head, val);
+                break;
+            case 15:
+                reverseList(&head);
+                break;
+            case 0:
+                exit(0);
         }
     }
-
     return 0;
 }

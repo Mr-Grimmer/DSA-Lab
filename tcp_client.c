@@ -1,71 +1,95 @@
+/* tcpClient.c */
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <unistd.h> 
 #include <string.h>
-#include <unistd.h>
-#include <sys/socket.h>     // For socket functions
-#include <netinet/in.h>     // For sockaddr_in
-#include <arpa/inet.h>      // For inet_pton
+#include <strings.h>
+#include <stdlib.h>
 
-#define PORT 8080
-#define BUFFER_SIZE 1024
+#define MAX_MSG 100
+#define SERVER_ADDR "127.0.0.1"
+#define CLIENT_ADDR "127.0.0.1"
+#define SERVER_PORT 1500
+#define CLIENT_PORT 2500
 
-int main() {
-    int sock;
-    struct sockaddr_in server_address;
-    char buffer[BUFFER_SIZE];
+int main () {
 
-    // 1. Create socket
-    sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
-        perror("Socket creation failed");
-        exit(EXIT_FAILURE);
-    }
+  int sd, rc, i;
+  struct sockaddr_in clientAddr, servAddr;
+  char line[MAX_MSG];
 
-    // 2. Define server address
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(PORT);
 
-    // Convert IPv4 address from text to binary
-    if (inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr) <= 0) {
-        perror("Invalid address/ Address not supported");
-        exit(EXIT_FAILURE);
-    }
+  /**********************************/	
+  /* build server address structure */
+  /**********************************/	
 
-    // 3. Connect to the server
-    if (connect(sock, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
-        perror("Connection failed");
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
+  bzero((char *)&servAddr, sizeof(servAddr));
+  servAddr.sin_family = AF_INET;
+  servAddr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+  servAddr.sin_port = htons(SERVER_PORT);
 
-    printf("Connected to server. Type messages (type 'quit' to exit):\n");
+/*
+  bzero((char *)&servAddr, sizeof(servAddr));
+  servAddr.sin_family = AF_INET;
+  inet_aton(SERVER_ADDR, &servAddr.sin_addr);
+  servAddr.sin_port = htons(SERVER_PORT);
+*/
 
-    // 4. Communication loop
-    while (1) {
-        printf("You: ");
-        fgets(buffer, BUFFER_SIZE, stdin);
+  /**********************************/	
+  /* build client address structure */
+  /**********************************/	
 
-        // Send message
-        send(sock, buffer, strlen(buffer), 0);
+  bzero((char *)&clientAddr, sizeof(clientAddr));
+  clientAddr.sin_family = AF_INET;
+  clientAddr.sin_addr.s_addr = INADDR_ANY;
+  clientAddr.sin_port = htons(0);
 
-        // Remove newline before checking quit
-        buffer[strcspn(buffer, "\n")] = '\0';
-        if (strcmp(buffer, "quit") == 0) {
-            printf("Exiting client.\n");
-            break;
-        }
+/*
+  bzero((char *)&clientAddr, sizeof(clientAddr));
+  clientAddr.sin_family = AF_INET;
+  clientAddr.sin_addr.s_addr = inet_addr(CLIENT_ADDR);
+  clientAddr.sin_port = htons(CLIENT_PORT);
+*/
 
-        // Receive response
-        memset(buffer, 0, BUFFER_SIZE);
-        int valread = recv(sock, buffer, BUFFER_SIZE, 0);
-        if (valread <= 0) {
-            printf("Server closed connection.\n");
-            break;
-        }
-        printf("Server: %s", buffer);
-    }
+  /************************/	
+  /* create stream socket */
+  /************************/	
 
-    // 5. Close the socket
-    close(sock);
-    return 0;
+  sd = socket(AF_INET, SOCK_STREAM, 0);
+  printf("successfully created stream socket \n");
+
+  /**************************/	
+  /* bind local port number */
+  /**************************/	
+
+  bind(sd, (struct sockaddr *) &clientAddr, sizeof(clientAddr));
+  printf("bound local port successfully\n");
+			
+  /*********************/	
+  /* connect to server */
+  /*********************/
+
+  connect(sd, (struct sockaddr *) &servAddr, sizeof(servAddr));
+  printf("connected to server successfully\n");
+
+    /***********************/
+    /* send data to server */
+    /***********************/  
+
+  do{
+    printf("Enter string to send to server : ");
+    scanf("%s", line);
+
+    send(sd, line, strlen(line) + 1, 0);
+    printf("data sent (%s)\n", line);    
+  }while(strcmp(line, "quit"));
+  
+  
+  printf("closing connection with the server\n");
+  close(sd);
 }

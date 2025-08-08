@@ -2,81 +2,70 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/socket.h>     // <-- Required for socket functions
+#include <sys/socket.h>     // For socket functions
 #include <netinet/in.h>     // For sockaddr_in
-#include <arpa/inet.h>      // For inet_ntoa, htons
+#include <arpa/inet.h>      // For inet_pton
 
 #define PORT 8080
 #define BUFFER_SIZE 1024
 
 int main() {
-    int server_fd, new_socket;
-    struct sockaddr_in address;
+    int sock;
+    struct sockaddr_in server_address;
     char buffer[BUFFER_SIZE];
-    int addrlen = sizeof(address);
 
     // 1. Create socket
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd == -1) {
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
 
-    // 2. Define address
-    address.sin_family = AF_INET;
-    address.sin_addr.s_addr = INADDR_ANY; // Accept from any interface
-    address.sin_port = htons(PORT);       // Convert to network byte order
+    // 2. Define server address
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(PORT);
 
-    // 3. Bind the socket to IP/Port
-    if (bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0) {
-        perror("Bind failed");
-        close(server_fd);
+    // Convert IPv4 address from text to binary
+    if (inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr) <= 0) {
+        perror("Invalid address/ Address not supported");
         exit(EXIT_FAILURE);
     }
 
-    // 4. Listen for incoming connections
-    if (listen(server_fd, 3) < 0) {
-        perror("Listen failed");
-        close(server_fd);
+    // 3. Connect to the server
+    if (connect(sock, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
+        perror("Connection failed");
+        close(sock);
         exit(EXIT_FAILURE);
     }
 
-    printf("Server listening on port %d...\n", PORT);
+    printf("Connected to server. Type messages (type 'quit' to exit):\n");
 
-    // 5. Accept client connection
-    new_socket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen);
-    if (new_socket < 0) {
-        perror("Accept failed");
-        close(server_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    printf("Connected to client: %s:%d\n", inet_ntoa(address.sin_addr), ntohs(address.sin_port));
-
-    // 6. Communication loop
+    // 4. Communication loop
     while (1) {
-        memset(buffer, 0, BUFFER_SIZE);
-        int bytes_received = recv(new_socket, buffer, BUFFER_SIZE - 1, 0);
-        if (bytes_received <= 0) {
-            printf("Client disconnected or error occurred.\n");
-            break;
-        }
+        printf("You: ");
+        fgets(buffer, BUFFER_SIZE, stdin);
 
-        buffer[strcspn(buffer, "\n")] = '\0'; // Remove newline character
-        printf("Client: %s\n", buffer);
+        // Send message
+        send(sock, buffer, strlen(buffer), 0);
 
+        // Remove newline before checking quit
+        buffer[strcspn(buffer, "\n")] = '\0';
         if (strcmp(buffer, "quit") == 0) {
-            printf("Received 'quit'. Closing connection.\n");
+            printf("Exiting client.\n");
             break;
         }
 
-        const char* response = "Message received\n";
-        send(new_socket, response, strlen(response), 0);
+        // Receive response
+        memset(buffer, 0, BUFFER_SIZE);
+        int valread = recv(sock, buffer, BUFFER_SIZE, 0);
+        if (valread <= 0) {
+            printf("Server closed connection.\n");
+            break;
+        }
+        printf("Server: %s", buffer);
     }
 
-    // 7. Close sockets
-    close(new_socket);
-    close(server_fd);
-
+    // 5. Close the socket
+    close(sock);
     return 0;
 }

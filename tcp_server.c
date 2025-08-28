@@ -1,105 +1,67 @@
-/* tcpServer.c */
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
 #include <stdio.h>
-#include <unistd.h> 
-#include <string.h>
-#include <strings.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 
-#define MAX_MSG 100
-#define SERVER_ADDR "127.0.0.1"
+#define BUFFER_SIZE 100
+#define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 1500
 
+int main() {
+    int serverSocket, clientSocket, receivedBytes;
+    socklen_t clientAddrLen;
+    struct sockaddr_in serverAddr, clientAddr;
+    char buffer[BUFFER_SIZE];
 
-int main ( ) {
-  
-  int sd, newSd, cliLen, n;
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = inet_addr(SERVER_IP);
+    serverAddr.sin_port = htons(SERVER_PORT);
 
-  struct sockaddr_in cliAddr, servAddr;
-  char line[MAX_MSG];
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0) {
+        perror("Socket creation failed");
+        exit(1);
+    }
+    printf("Server socket created\n");
 
+    if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) {
+        perror("Bind failed");
+        close(serverSocket);
+        exit(1);
+    }
+    printf("Bind successful\n");
 
-  /**********************************/	
-  /* build server address structure */
-  /**********************************/	
+    listen(serverSocket, 5);
+    printf("Server listening on port %d\n", SERVER_PORT);
 
-  bzero((char *)&servAddr, sizeof(servAddr));
-  servAddr.sin_family = AF_INET;
-  servAddr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
-  servAddr.sin_port = htons(SERVER_PORT);
+    while (1) {
+        clientAddrLen = sizeof(clientAddr);
+        clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddr, &clientAddrLen);
+        if (clientSocket < 0) {
+            perror("Accept failed");
+            continue;
+        }
 
-/*
-  bzero((char *)&servAddr, sizeof(servAddr));
-  servAddr.sin_family = AF_INET;
-  inet_aton(SERVER_ADDR, &servAddr.sin_addr);
-  servAddr.sin_port = htons(SERVER_PORT);
-*/
+        printf("Client connected [IP %s, Port %d]\n",
+               inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
 
+        while (1) {
+            memset(buffer, 0, BUFFER_SIZE);
+            receivedBytes = recv(clientSocket, buffer, BUFFER_SIZE, 0);
+            if (receivedBytes <= 0) break;
+            printf("Message from [IP %s, Port %d]: %s\n",
+                   inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port), buffer);
+            if (strcmp(buffer, "quit") == 0) break;
+        }
 
-  /************************/	
-  /* create stream socket */
-  /************************/	
+        printf("Closing connection with [IP %s, Port %d]\n",
+               inet_ntoa(clientAddr.sin_addr), ntohs(clientAddr.sin_port));
+        close(clientSocket);
+    }
 
-  sd = socket(AF_INET, SOCK_STREAM, 0);
-  printf("successfully created stream socket \n");
-
-  /**************************/	
-  /* bind local port number */
-  /**************************/	
-  
-  bind(sd, (struct sockaddr *) &servAddr, sizeof(servAddr));
-  printf("bound local port successfully\n");
-
-
-  /********************************/	
-  /* specify number of concurrent */ 
-  /* clients to listen for        */
-  /********************************/	
-
-  listen(sd,5);
- 
- 
-  while(1) {
-
-    printf("waiting for client connection on port TCP %u\n",SERVER_PORT);
-
-    /*****************************/
-    /* wait for client connection*/
-    /*****************************/    
-
-    newSd = accept(sd, (struct sockaddr *) &cliAddr, &cliLen);
-
-    printf("received connection from host [IP %s ,TCP port %d]\n", 
-                 inet_ntoa(cliAddr.sin_addr), ntohs(cliAddr.sin_port));
- 
-    /*****************************/
-    /* wait for data from client */
-    /*****************************/       
-    
-    do{
-      memset(line,0x0,MAX_MSG);
-    
-      n=recv(newSd, line, MAX_MSG, 0);
-      line[n]='\n'; 
-    
-      printf("received from host [IP %s ,TCP port %d] : %s\n",  
-                 inet_ntoa(cliAddr.sin_addr), ntohs(cliAddr.sin_port), line);
-
-    }while(abs(strcmp(line, "quit")));
-
-
-    /**************************/
-    /* close client connection*/
-    /**************************/    
-
-    printf("closing connection with host [IP %s ,TCP port %d]\n", 
-                 inet_ntoa(cliAddr.sin_addr), ntohs(cliAddr.sin_port));
-
-    close(newSd);
-  } 
+    close(serverSocket);
+    return 0;
 }

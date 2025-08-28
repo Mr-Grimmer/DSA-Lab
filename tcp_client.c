@@ -1,95 +1,57 @@
-/* tcpClient.c */
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
 #include <stdio.h>
-#include <unistd.h> 
-#include <string.h>
-#include <strings.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 
-#define MAX_MSG 100
-#define SERVER_ADDR "127.0.0.1"
-#define CLIENT_ADDR "127.0.0.1"
+#define BUFFER_SIZE 100
+#define SERVER_IP "127.0.0.1"
 #define SERVER_PORT 1500
-#define CLIENT_PORT 2500
 
-int main () {
+int main() {
+    int clientSocket;
+    struct sockaddr_in serverAddr, localAddr;
+    char message[BUFFER_SIZE];
 
-  int sd, rc, i;
-  struct sockaddr_in clientAddr, servAddr;
-  char line[MAX_MSG];
+    memset(&serverAddr, 0, sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_addr.s_addr = inet_addr(SERVER_IP);
+    serverAddr.sin_port = htons(SERVER_PORT);
 
+    memset(&localAddr, 0, sizeof(localAddr));
+    localAddr.sin_family = AF_INET;
+    localAddr.sin_addr.s_addr = INADDR_ANY;
+    localAddr.sin_port = htons(0);
 
-  /**********************************/	
-  /* build server address structure */
-  /**********************************/	
+    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket < 0) {
+        perror("Socket creation failed");
+        exit(1);
+    }
+    printf("Client socket created\n");
 
-  bzero((char *)&servAddr, sizeof(servAddr));
-  servAddr.sin_family = AF_INET;
-  servAddr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
-  servAddr.sin_port = htons(SERVER_PORT);
+    if (bind(clientSocket, (struct sockaddr *)&localAddr, sizeof(localAddr)) < 0) {
+        perror("Bind failed");
+        close(clientSocket);
+        exit(1);
+    }
 
-/*
-  bzero((char *)&servAddr, sizeof(servAddr));
-  servAddr.sin_family = AF_INET;
-  inet_aton(SERVER_ADDR, &servAddr.sin_addr);
-  servAddr.sin_port = htons(SERVER_PORT);
-*/
+    if (connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) {
+        perror("Connection failed");
+        close(clientSocket);
+        exit(1);
+    }
+    printf("Connected to server\n");
 
-  /**********************************/	
-  /* build client address structure */
-  /**********************************/	
+    while (1) {
+        printf("Enter message: ");
+        scanf("%s", message);
+        send(clientSocket, message, strlen(message) + 1, 0);
+        if (strcmp(message, "quit") == 0) break;
+    }
 
-  bzero((char *)&clientAddr, sizeof(clientAddr));
-  clientAddr.sin_family = AF_INET;
-  clientAddr.sin_addr.s_addr = INADDR_ANY;
-  clientAddr.sin_port = htons(0);
-
-/*
-  bzero((char *)&clientAddr, sizeof(clientAddr));
-  clientAddr.sin_family = AF_INET;
-  clientAddr.sin_addr.s_addr = inet_addr(CLIENT_ADDR);
-  clientAddr.sin_port = htons(CLIENT_PORT);
-*/
-
-  /************************/	
-  /* create stream socket */
-  /************************/	
-
-  sd = socket(AF_INET, SOCK_STREAM, 0);
-  printf("successfully created stream socket \n");
-
-  /**************************/	
-  /* bind local port number */
-  /**************************/	
-
-  bind(sd, (struct sockaddr *) &clientAddr, sizeof(clientAddr));
-  printf("bound local port successfully\n");
-			
-  /*********************/	
-  /* connect to server */
-  /*********************/
-
-  connect(sd, (struct sockaddr *) &servAddr, sizeof(servAddr));
-  printf("connected to server successfully\n");
-
-    /***********************/
-    /* send data to server */
-    /***********************/  
-
-  do{
-    printf("Enter string to send to server : ");
-    scanf("%s", line);
-
-    send(sd, line, strlen(line) + 1, 0);
-    printf("data sent (%s)\n", line);    
-  }while(strcmp(line, "quit"));
-  
-  
-  printf("closing connection with the server\n");
-  close(sd);
+    printf("Disconnected from server\n");
+    close(clientSocket);
+    return 0;
 }
